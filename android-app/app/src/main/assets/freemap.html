@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<style>
+*{margin:0;padding:0;}
+#map{width:100vw;height:100vh;}
+</style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+</head>
+<body>
+<div id="map"></div>
+<script>
+var map = null;
+var markers = [];
+var polylines = [];
+
+function initMap(lat, lng, level) {
+    if (map) {
+        map.remove();
+        map = null;
+    }
+    map = L.map('map', {zoomControl: false}).setView([lat, lng], level || 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19
+    }).addTo(map);
+}
+
+function clearMarkers() {
+    markers.forEach(function(m) { m.remove(); });
+    markers = [];
+}
+
+function clearPolylines() {
+    polylines.forEach(function(p) { p.remove(); });
+    polylines = [];
+}
+
+function addMarker(id, name, lat, lng, type, price) {
+    if (!map) return;
+    var iconColors = {
+        'START':  '#2E7D32',
+        'GOAL':   '#C62828',
+        'REFUEL': '#EF6C00',
+        'NORMAL': '#1565C0'
+    };
+    var color = iconColors[type] || iconColors['NORMAL'];
+    var size = type === 'NORMAL' ? 10 : 14;
+
+    var icon = L.divIcon({
+        className: 'custom-marker',
+        html: '<div style="background:' + color + ';width:' + size + 'px;height:' + size + 'px;border-radius:50%;border:2px solid white;box-shadow:0 0 4px rgba(0,0,0,0.4);"></div>',
+        iconSize: [size, size],
+        iconAnchor: [size/2, size/2]
+    });
+    var marker = L.marker([lat, lng], {icon: icon}).addTo(map);
+    marker.bindPopup('<b>' + name + '</b><br>' + (price ? price + ' KRW/L' : ''));
+    markers.push(marker);
+}
+
+function drawPath(pathJson) {
+    if (!map) return;
+    try {
+        var coords = JSON.parse(pathJson);
+        var latlngs = coords.map(function(c) { return [c[0], c[1]]; });
+        var polyline = L.polyline(latlngs, {
+            color: '#E53935',
+            weight: 6,
+            opacity: 0.85
+        }).addTo(map);
+        polylines.push(polyline);
+    } catch(e) { console.error(e); }
+}
+
+function fitBounds(swLat, swLng, neLat, neLng) {
+    if (!map) return;
+    map.fitBounds([[swLat, swLng], [neLat, neLng]], {padding: [30, 30]});
+}
+
+function zoomIn()  { if (map) map.zoomIn(); }
+function zoomOut() { if (map) map.zoomOut(); }
+</script>
+</body>
+</html>

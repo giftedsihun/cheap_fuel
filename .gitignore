@@ -1,0 +1,30 @@
+# Build outputs
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+.env
+
+# Android build outputs
+android-app/.gradle/
+android-app/build/
+android-app/app/build/
+android-app/local.properties
+android-app/.idea/
+android-app/captures/
+android-app/app/release/
+android-app/app/debug/
+*.apk
+*.aab
+*.iml
+.DS_Store
+
+# Generated maps
+fuel_map_*.html
+
+# IDE
+.vscode/
+*.swp

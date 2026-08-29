@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<style>
+*{margin:0;padding:0;}
+#map{width:100vw;height:100vh;}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=YOUR_KAKAO_APP_KEY&libraries=services"></script>
+<script>
+var map = null;
+var markers = [];
+var polylines = [];
+var currentCenter = null;
+
+function initMap(lat, lng, level) {
+    var container = document.getElementById('map');
+    var options = {
+        center: new kakao.maps.LatLng(lat, lng),
+        level: level || 8
+    };
+    map = new kakao.maps.Map(container, options);
+    currentCenter = map.getCenter();
+}
+
+function setCenter(lat, lng, level) {
+    if (!map) return;
+    var moveLatLng = new kakao.maps.LatLng(lat, lng);
+    map.setCenter(moveLatLng);
+    if (level) map.setLevel(level);
+}
+
+function clearMarkers() {
+    markers.forEach(function(m) { m.setMap(null); });
+    markers = [];
+}
+
+function clearPolylines() {
+    polylines.forEach(function(p) { p.setMap(null); });
+    polylines = [];
+}
+
+function addMarker(id, name, lat, lng, type, price) {
+    if (!map) return;
+    var colorMap = {
+        'START':  '#4CAF50',
+        'GOAL':   '#F44336',
+        'REFUEL': '#FF9800',
+        'NORMAL': '#2196F3'
+    };
+    var color = colorMap[type] || colorMap['NORMAL'];
+
+    var content = '<div style="padding:4px 8px;background:' + color + ';color:white;border-radius:12px;font-size:12px;font-weight:bold;white-space:nowrap;">' +
+        (type === 'START' ? 'START' : type === 'GOAL' ? 'GOAL' : type === 'REFUEL' ? 'REFUEL' : '📍') +
+        ' ' + name + (price ? '<br>' + price + '원/L' : '') +
+        '</div>';
+
+    var customOverlay = new kakao.maps.CustomOverlay({
+        map: map,
+        content: content,
+        position: new kakao.maps.LatLng(lat, lng),
+        yAnchor: 1.4,
+        xAnchor: 0.5
+    });
+    markers.push(customOverlay);
+}
+
+function drawPath(pathJson) {
+    if (!map) return;
+    clearPolylines();
+    try {
+        var coords = JSON.parse(pathJson);
+        var linePath = coords.map(function(c) {
+            return new kakao.maps.LatLng(c[0], c[1]);
+        });
+        var polyline = new kakao.maps.Polyline({
+            map: map,
+            path: linePath,
+            strokeWeight: 6,
+            strokeColor: '#E53935',
+            strokeOpacity: 0.9,
+            strokeStyle: 'solid'
+        });
+        polylines.push(polyline);
+    } catch(e) {
+        console.error('Path draw error:', e);
+    }
+}
+
+function fitBounds(swLat, swLng, neLat, neLng) {
+    if (!map) return;
+    var sw = new kakao.maps.LatLng(swLat, swLng);
+    var ne = new kakao.maps.LatLng(neLat, neLng);
+    var bounds = new kakao.maps.LatLngBounds(sw, ne);
+    map.setBounds(bounds);
+}
+
+function zoomIn()  { if (map) map.setLevel(map.getLevel() - 1); }
+function zoomOut() { if (map) map.setLevel(map.getLevel() + 1); }
+
+window.addEventListener('message', function(e) {
+    var data = e.data;
+    if (!data || !data.type) return;
+    switch(data.type) {
+        case 'init':
+            initMap(data.lat || 37.5665, data.lng || 126.9780, data.level || 8);
+            break;
+        case 'setCenter':
+            setCenter(data.lat, data.lng, data.level);
+            break;
+        case 'clear':
+            clearMarkers();
+            clearPolylines();
+            break;
+        case 'marker':
+            addMarker(data.id, data.name, data.lat, data.lng, data.markerType, data.price);
+            break;
+        case 'path':
+            drawPath(data.pathJson);
+            break;
+        case 'fitBounds':
+            fitBounds(data.swLat, data.swLng, data.neLat, data.neLng);
+            break;
+        case 'zoomIn':
+            zoomIn();
+            break;
+        case 'zoomOut':
+            zoomOut();
+            break;
+    }
+});
+
+document.addEventListener('KakaoMapReady', function() {
+    window.parent.postMessage({type:'ready'}, '*');
+});
+</script>
+</body>
+</html>
