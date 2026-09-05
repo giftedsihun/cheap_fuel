@@ -80,8 +80,7 @@ fun HomeScreen(
                     }
                 }
             }
-        },
-        tonalElevation = 0.dp
+        }
     ) { innerPadding ->
         Column(
             modifier = modifier

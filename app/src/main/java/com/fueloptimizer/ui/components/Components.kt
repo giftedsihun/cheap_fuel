@@ -139,23 +139,22 @@ fun TossSelector(
             DropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { onExpandedChange(false) },
-                modifier = Modifier.background(MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(12.dp),
-                tonalElevation = 8.dp
+                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
             ) {
                 options.forEach { option ->
                     DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = option,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        },
                         onClick = {
                             onValueChange(option)
                             onExpandedChange(false)
                         },
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-                    ) {
-                        Text(
-                            text = option,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
+                    )
                 }
             }
         }
