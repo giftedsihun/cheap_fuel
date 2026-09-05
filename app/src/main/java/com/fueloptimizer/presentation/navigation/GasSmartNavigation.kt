@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.fueloptimizer.presentation.home.HomeScreen
+import com.fueloptimizer.presentation.map.MapScreen
 import com.fueloptimizer.presentation.result.ResultScreen
 import com.fueloptimizer.presentation.search.PlaceSearchScreen
 import com.fueloptimizer.presentation.settings.SettingsScreen
@@ -17,6 +18,7 @@ import com.fueloptimizer.presentation.settings.SettingsScreen
 enum class BottomNavItem(val route: String, val label: String, val icon: ImageVector) {
     HOME("home", "홈", Icons.Filled.Home),
     RESULT("result", "결과", Icons.Filled.Assessment),
+    MAP("map", "지도", Icons.Filled.Map),
     SETTINGS("settings", "설정", Icons.Filled.Settings)
 }
 
@@ -63,9 +65,13 @@ fun GasSmartNavigation(
                     onNavigateToResult = { onNavigateTo("result") }
                 )
                 "result" -> ResultScreen(
+                    viewModel = viewModel,
+                    onNavigateToMap = { onNavigateTo("map") }
+                )
+                "map" -> MapScreen(
                     viewModel = viewModel
                 )
-                "settings" -> SettingsScreen()
+                "settings" -> SettingsScreen(viewModel = viewModel)
                 "search" -> PlaceSearchScreen(
                     viewModel = viewModel,
                     onBack = { viewModel.cancelPlaceSearch() }

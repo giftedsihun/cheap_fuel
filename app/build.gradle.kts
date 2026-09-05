@@ -12,6 +12,8 @@ if (localPropsFile.exists()) {
 }
 val kakaoRestApiKey: String =
     localProps.getProperty("kakaoRestApiKey", System.getenv("KAKAO_REST_API_KEY") ?: "")
+val opinetCertKey: String =
+    localProps.getProperty("opinetCertKey", System.getenv("OPINET_CERT_KEY") ?: "")
 
 android {
     namespace = "com.fueloptimizer"
@@ -24,6 +26,7 @@ android {
         versionCode = 1
         versionName = "1.0"
         buildConfigField("String", "KAKAO_REST_API_KEY", "\"$kakaoRestApiKey\"")
+        buildConfigField("String", "OPINET_CERT_KEY", "\"$opinetCertKey\"")
     }
 
     buildTypes {
@@ -81,4 +84,10 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    // DataStore for persistence
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // osmdroid for in-app map
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
 }

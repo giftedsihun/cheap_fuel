@@ -1,27 +1,50 @@
 package com.fueloptimizer.presentation
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.fueloptimizer.BuildConfig
+import com.fueloptimizer.data.UserStore
 import com.fueloptimizer.domain.*
 import com.fueloptimizer.network.KakaoClient
-import com.fueloptimizer.network.MockStations
+import com.fueloptimizer.network.KakaoRouteProvider
+import com.fueloptimizer.network.MockRouteProvider
+import com.fueloptimizer.network.MockStationProvider
+import com.fueloptimizer.network.OpinetStationProvider
 import com.fueloptimizer.network.SamplePlaces
+import java.util.Date
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class MainViewModel : ViewModel() {
+class MainViewModel(application: Application) : AndroidViewModel(application) {
+    private val store = UserStore(application)
+
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state
+
+    val fills: StateFlow<List<FillRecord>> = store.fillsFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val reports: StateFlow<List<StationReport>> = store.reportsFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val departAtMs: StateFlow<Long?> = store.departAtFlow
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private val _currentRoute = MutableStateFlow<Route?>(null)
     val currentRoute: StateFlow<Route?> = _currentRoute
 
     private val _refuelPlan = MutableStateFlow<RefuelPlan?>(null)
     val refuelPlan: StateFlow<RefuelPlan?> = _refuelPlan
+
+    private val _calculating = MutableStateFlow(false)
+    val calculating: StateFlow<Boolean> = _calculating
+
+    private val _planError = MutableStateFlow<String?>(null)
+    val planError: StateFlow<String?> = _planError
 
     private val _navigationRoute = MutableStateFlow("home")
     val navigationRoute: StateFlow<String> = _navigationRoute
@@ -38,16 +61,12 @@ class MainViewModel : ViewModel() {
     private var placeSearchJob: Job? = null
 
     init {
-        _state.value = UiState(
-            vehicle = Vehicle(
-                fuelKind = FuelKind.gasoline,
-                kmPerLiter = 12.0,
-                tankCapacityL = 50.0,
-                currentFuelL = 20.0,
-                reserveL = 5.0
-            ),
-            preferences = Preferences()
-        )
+        viewModelScope.launch {
+            store.vehicleFlow.collect { v -> _state.value = _state.value.copy(vehicle = v) }
+        }
+        viewModelScope.launch {
+            store.preferencesFlow.collect { p -> _state.value = _state.value.copy(preferences = p) }
+        }
     }
 
     fun navigateTo(route: String) {
@@ -107,10 +126,12 @@ class MainViewModel : ViewModel() {
 
     fun updateVehicle(vehicle: Vehicle) {
         _state.value = _state.value.copy(vehicle = vehicle)
+        viewModelScope.launch { store.saveVehicle(vehicle) }
     }
 
     fun updatePreferences(preferences: Preferences) {
         _state.value = _state.value.copy(preferences = preferences)
+        viewModelScope.launch { store.savePreferences(preferences) }
     }
 
     fun clearOrigin() {
@@ -121,174 +142,118 @@ class MainViewModel : ViewModel() {
         _state.value = _state.value.copy(destination = null)
     }
 
-    fun calculateRoute() {
-        val origin = _state.value.origin ?: return
-        val destination = _state.value.destination ?: return
+    fun setDepartAt(epochMs: Long?) {
+        viewModelScope.launch { store.saveDepartAt(epochMs) }
+    }
 
+    fun addFill(kmDriven: Double, liters: Double) {
         viewModelScope.launch {
-            val distance = haversineDistance(origin.lat, origin.lng, destination.lat, destination.lng)
-            val distanceM = distance * 1000
-            val route = Route(
-                id = "route_1",
-                origin = origin,
-                destination = destination,
-                distanceM = distanceM,
-                durationS = distanceM * 3.6 / 50.0,
-                polyline = listOf(origin, destination),
-                summary = "직선 거리 ${String.format("%.0f", distance)}km"
-            )
-            _currentRoute.value = route
-            calculateRefuelPlan(route)
+            val id = java.util.UUID.randomUUID().toString()
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+            sdf.timeZone = java.util.TimeZone.getTimeZone("Asia/Seoul")
+            store.addFill(FillRecord(id = id, at = sdf.format(Date()), kmDriven = kmDriven, liters = liters))
         }
     }
 
-    private fun calculateRefuelPlan(route: Route) {
+    fun addReport(stationId: String, stationName: String, kind: ReportKind, note: String = "") {
+        viewModelScope.launch {
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+            sdf.timeZone = java.util.TimeZone.getTimeZone("Asia/Seoul")
+            store.addReport(
+                StationReport(
+                    stationId = stationId,
+                    stationName = stationName,
+                    kind = kind,
+                    note = note,
+                    reportedAt = sdf.format(Date())
+                )
+            )
+        }
+    }
+
+    fun dismissPlanError() {
+        _planError.value = null
+    }
+
+    fun calculateRoute() {
+        val origin = _state.value.origin ?: return
+        val destination = _state.value.destination ?: return
         val vehicle = _state.value.vehicle ?: return
         val preferences = _state.value.preferences ?: return
 
         viewModelScope.launch {
-            val stations = MockStations.sampleStations
-            val prices = stations.mapNotNull { it.prices[vehicle.fuelKind] }
-            val refPrice = if (prices.isNotEmpty()) median(prices) else 1800.0
+            _calculating.value = true
+            _planError.value = null
+            try {
+                val departAt = departAtMs.value?.let { Date(it) }
+                val kakaoKey = BuildConfig.KAKAO_REST_API_KEY
+                val opinetKey = BuildConfig.OPINET_CERT_KEY
 
-            val options = stations.mapNotNull { station ->
-                val detourDist = haversineDistance(
-                    route.origin.lat, route.origin.lng, station.lat, station.lng
-                ) * 1000
+                // 1. 경로
+                var routeProviderLabel = "직선보간"
+                var route: Route? = null
+                if (kakaoKey.isNotBlank()) {
+                    route = runCatching {
+                        KakaoRouteProvider(kakaoKey).findRoute(origin, destination, vehicle.fuelKind, departAt)
+                    }.getOrNull()
+                    if (route != null) routeProviderLabel = "카카오모빌리티"
+                }
+                if (route == null) {
+                    route = interpolateRoute(origin, destination)
+                }
+                _currentRoute.value = route
 
-                val detour = Detour(
-                    extraDistanceM = detourDist,
-                    extraDurationS = detourDist * 3.6 / 40.0,
-                    extraTollKrw = 0.0,
-                    alongRouteM = 0.0,
-                    joinPoint = PointLatLng(station.lat, station.lng),
-                    source = "geometric-estimate"
-                )
+                // 2. 주유소 후보
+                val requestedHalfWidth = maxOf(MIN_CORRIDOR_HALF_WIDTH_M, preferences.maxDetourKm * 1000 / 2)
+                var stationProviderLabel = "오프라인 샘플"
+                val stations: List<Station> = if (opinetKey.isNotBlank()) {
+                    val live = runCatching {
+                        OpinetStationProvider(opinetKey).findAlongRoute(route, vehicle.fuelKind, requestedHalfWidth)
+                    }.getOrElse { emptyList() }
+                    if (live.isNotEmpty()) {
+                        stationProviderLabel = "오피넷 실가격"
+                        live
+                    } else {
+                        stationProviderLabel = "오피넷 실패→샘플"
+                        MockStationProvider().findAlongRoute()
+                    }
+                } else {
+                    MockStationProvider().findAlongRoute()
+                }
 
-                evaluateOption(
-                    station = station,
-                    detour = detour,
-                    ctx = CostContext(
+                // 3. 우회 계산기
+                val detourComputer: DetourComputer = if (kakaoKey.isNotBlank()) {
+                    KakaoRouteProvider(kakaoKey)
+                } else {
+                    MockRouteProvider()
+                }
+                val detourSource = if (kakaoKey.isNotBlank()) "routing-api" else "geometric-estimate"
+
+                // 4. 계획
+                val departDate = departAt ?: Date()
+                val plan = buildRefuelPlan(
+                    PlanInput(
                         vehicle = vehicle,
                         preferences = preferences,
                         route = route,
-                        referencePriceKrwPerL = refPrice,
-                        departAt = java.util.Date(),
-                        congestionFactor = 1.0
-                    )
+                        stations = stations,
+                        routeProviderLabel = routeProviderLabel,
+                        stationProviderLabel = stationProviderLabel,
+                        detourSource = detourSource,
+                        departAt = departDate,
+                        congestionFactor = congestionFactorAt(departDate, routeLooksDivided(route)),
+                        reports = reports.value,
+                        learnedKmPerLiter = learnedKmPerLiter(fills.value)
+                    ),
+                    detourComputer
                 )
+                _refuelPlan.value = plan
+            } catch (e: Exception) {
+                _planError.value = "계획 계산에 실패했습니다: ${e.message}"
+            } finally {
+                _calculating.value = false
             }
-
-            val sortedOptions = options
-                .filter { it.reachable }
-                .sortedBy { it.normalizedCostKrw }
-
-            val litersRequired = litersRequiredForTrip(vehicle, route.distanceM, preferences.fillPolicy)
-            val tripNeedL = route.distanceM / 1000 / vehicle.kmPerLiter
-            val canReach = tripNeedL <= vehicle.currentFuelL - destinationHoldL(vehicle, preferences.fillPolicy)
-
-            val best = sortedOptions.firstOrNull()
-            val baselineCost = refPrice * litersRequired
-            val bestSaving = best?.let { baselineCost - it.normalizedCostKrw } ?: 0.0
-
-            val verdict = when {
-                options.isEmpty() -> Verdict.noCandidates
-                canReach -> Verdict.noRefuelNeeded
-                best == null -> Verdict.stayOnRoute
-                bestSaving >= preferences.minMeaningfulSavingKrw -> Verdict.detourWorthIt
-                bestSaving > 0 -> Verdict.marginal
-                else -> Verdict.stayOnRoute
-            }
-
-            val headline = when (verdict) {
-                Verdict.noCandidates -> "주유할 곳이 없습니다"
-                Verdict.noRefuelNeeded -> "주유 없이 도착 가능합니다"
-                Verdict.detourWorthIt -> "우회 주유가 절약됩니다"
-                Verdict.marginal -> "절감이 근소합니다 — 우회는 선택"
-                Verdict.stayOnRoute -> "가장 가까운 곳에서 주유하세요"
-                else -> "최적 주유 계획"
-            }
-
-            val plan = RefuelPlan(
-                route = route,
-                vehicle = vehicle,
-                preferences = preferences,
-                litersRequiredWithoutDetour = litersRequired,
-                canReachWithoutRefueling = canReach,
-                referencePriceKrwPerL = refPrice,
-                baseline = best?.let { toRanked(it, 1, baselineCost) },
-                best = best?.let { toRanked(it, 1, baselineCost) },
-                options = sortedOptions.mapIndexed { index, option ->
-                    toRanked(option, index + 1, baselineCost)
-                },
-                excluded = emptyList(),
-                verdict = verdict,
-                headline = headline,
-                itinerary = emptyList(),
-                meta = PlanMeta(
-                    stationProvider = "mock",
-                    routeProvider = "haversine",
-                    detourSource = "geometric-estimate",
-                    computedAt = java.time.Instant.now().toString(),
-                    candidateCount = stations.size,
-                    exactlyEvaluated = options.count { it.reachable },
-                    corridorHalfWidthM = 1000.0,
-                    requestedHalfWidthM = preferences.maxDetourKm * 1000,
-                    corridorTruncated = false,
-                    searchRadiusM = 5000.0,
-                    searchCallCount = 1,
-                    optimalityGuaranteed = true
-                )
-            )
-
-            _refuelPlan.value = plan
         }
-    }
-
-    private fun toRanked(option: RefuelOption, rank: Int, baselineCost: Double): RankedOption {
-        return RankedOption(
-            savingKrw = baselineCost - option.normalizedCostKrw,
-            savingPessimisticKrw = 0.0,
-            breakEvenDetourKm = 0.0,
-            stockUpValueKrw = 0.0,
-            rank = rank,
-            station = option.station,
-            detour = option.detour,
-            listPriceKrwPerL = option.listPriceKrwPerL,
-            effectivePriceKrwPerL = option.effectivePriceKrwPerL,
-            fuelOnArrivalL = option.fuelOnArrivalL,
-            reachable = option.reachable,
-            litersToBuy = option.litersToBuy,
-            tankCapped = option.tankCapped,
-            detourFuelL = option.detourFuelL,
-            fuelAtDestinationL = option.fuelAtDestinationL,
-            surplusFuelL = option.surplusFuelL,
-            shortfallFuelL = option.shortfallFuelL,
-            outOfPocketKrw = option.outOfPocketKrw,
-            detourFuelCostKrw = option.detourFuelCostKrw,
-            timeCostKrw = option.timeCostKrw,
-            tollDeltaKrw = option.tollDeltaKrw,
-            surplusCreditKrw = option.surplusCreditKrw,
-            shortfallCostKrw = option.shortfallCostKrw,
-            normalizedCostKrw = option.normalizedCostKrw,
-            krwPerUsefulLiter = option.krwPerUsefulLiter,
-            warnings = option.warnings
-        )
-    }
-
-    private fun haversineDistance(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
-        val R = 6371.0
-        val lat1Rad = Math.toRadians(lat1)
-        val lat2Rad = Math.toRadians(lat2)
-        val deltaLat = Math.toRadians(lat2 - lat1)
-        val deltaLng = Math.toRadians(lng2 - lng1)
-
-        val a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-                Math.cos(lat1Rad) * Math.cos(lat2Rad) *
-                Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2)
-        val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-
-        return R * c
     }
 }
 

@@ -134,12 +134,10 @@ data class CostContext(
     val forcedLiters: Double? = null,
 )
 
-data class StationReport(val stationId: String, val kind: String)
-
 fun evaluateOption(station: Station, detour: Detour, ctx: CostContext): RefuelOption? {
     val listPrice = station.prices[ctx.vehicle.fuelKind] ?: return null
 
-    val mismatch = ctx.reports.find { it.stationId == station.id && it.kind == "price-mismatch" }
+    val mismatch = ctx.reports.find { it.stationId == station.id && it.kind == ReportKind.priceMismatch }
     val listed = listPrice + (if (mismatch != null) 40 else 0)
     val effectivePrice = effectivePricePerLiter(listed, ctx.preferences, station.brand)
     val e = ctx.vehicle.kmPerLiter
@@ -237,7 +235,7 @@ fun evaluateOption(station: Station, detour: Detour, ctx: CostContext): RefuelOp
             ((ctx.route.durationS * (detour.alongRouteM / maxOf(1.0, ctx.route.distanceM)) + detour.extraDurationS) *
                 congestion * 1000).toLong()
     )
-    val reportedClosed = ctx.reports.any { it.stationId == station.id && (it.kind == "closed" || it.kind == "gone") }
+    val reportedClosed = ctx.reports.any { it.stationId == station.id && (it.kind == ReportKind.closed || it.kind == ReportKind.gone) }
     if (reportedClosed || !isOpenAt(station, arrivalAt)) {
         val minutes = minutesOfDayInSeoul(arrivalAt)
         val hhmm = String.format("%02d:%02d", minutes / 60, minutes % 60)
@@ -299,11 +297,11 @@ fun evaluateOption(station: Station, detour: Detour, ctx: CostContext): RefuelOp
         warnings.add(
             Warning(
                 code = WarningCode.userReported,
-                severity = if (report.kind == "price-mismatch") Severity.warn else Severity.error,
+                severity = if (report.kind == ReportKind.priceMismatch) Severity.warn else Severity.error,
                 message = when (report.kind) {
-                    "price-mismatch" -> "이전에 현장 가격이 다르다고 제보한 곳입니다."
-                    "closed" -> "영업하지 않는다고 제보한 곳입니다."
-                    "gone" -> "폐업·이전으로 제보한 곳입니다."
+                    ReportKind.priceMismatch -> "이전에 현장 가격이 다르다고 제보한 곳입니다."
+                    ReportKind.closed -> "영업하지 않는다고 제보한 곳입니다."
+                    ReportKind.gone -> "폐업·이전으로 제보한 곳입니다."
                     else -> ""
                 }
             )

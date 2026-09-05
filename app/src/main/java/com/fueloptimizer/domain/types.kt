@@ -32,6 +32,46 @@ enum class Brand {
     ETC
 }
 
+val FUEL_KIND_LABEL = mapOf(
+    FuelKind.gasoline to "휘발유",
+    FuelKind.premium to "고급휘발유",
+    FuelKind.diesel to "경유",
+    FuelKind.lpg to "자동차부탄(LPG)"
+)
+
+val BRAND_LABEL = mapOf(
+    Brand.SKE to "SK에너지",
+    Brand.GSC to "GS칼텍스",
+    Brand.HDO to "현대오일뱅크",
+    Brand.SOL to "S-OIL",
+    Brand.RTE to "자영알뜰",
+    Brand.RTX to "고속도로알뜰",
+    Brand.NHO to "농협알뜰",
+    Brand.ETC to "자가상표"
+)
+
+enum class ReportKind {
+    closed,
+    priceMismatch,
+    gone
+}
+
+data class StationReport(
+    val id: String = "",
+    val stationId: String,
+    val stationName: String = "",
+    val kind: ReportKind,
+    val note: String = "",
+    val reportedAt: String = ""
+)
+
+data class FillRecord(
+    val id: String,
+    val at: String,
+    val kmDriven: Double,
+    val liters: Double
+)
+
 data class Vehicle(
     val fuelKind: FuelKind,
     val kmPerLiter: Double,
@@ -100,6 +140,7 @@ data class Station(
     val openingHours: OpeningHours? = null,
     val address: String? = null,
     val accessHint: AccessHint? = null,
+    val hasCarWash: Boolean = false,
 )
 
 data class Route(

@@ -13,10 +13,13 @@ jobs:
           java-version: 17
           distribution: temurin
       - uses: android-actions/setup-android@v3
-      - name: Inject Kakao API key
+      - name: Inject API keys
         run: |
           if [ -n "${{ secrets.KAKAO_REST_API_KEY }}" ]; then
             echo "kakaoRestApiKey=${{ secrets.KAKAO_REST_API_KEY }}" >> local.properties
+          fi
+          if [ -n "${{ secrets.OPINET_CERT_KEY }}" ]; then
+            echo "opinetCertKey=${{ secrets.OPINET_CERT_KEY }}" >> local.properties
           fi
       - name: Build APK
         run: chmod +x gradlew && ./gradlew --no-daemon assembleDebug
