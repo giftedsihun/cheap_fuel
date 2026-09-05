@@ -6,6 +6,8 @@ import android.graphics.Color
 import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -63,6 +65,14 @@ fun MapScreen(
     Scaffold(
         topBar = {
             LargeTopAppBar(
+                navigationIcon = {
+                    IconButton(onClick = { viewModel.navigateTo("result") }) {
+                        Icon(
+                            imageVector = Icons.Filled.ArrowBack,
+                            contentDescription = "결과로 돌아가기"
+                        )
+                    }
+                },
                 title = {
                     Text(
                         text = "지도",
@@ -84,16 +94,6 @@ fun MapScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            if (route == null) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "홈에서 출발지와 도착지를 검색해주세요",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                return@Column
-            }
             val stations = plan?.options?.map { it.station }.orEmpty()
             val bestId = plan?.best?.station?.id
 
@@ -111,12 +111,23 @@ fun MapScreen(
                     }
                 },
                 update = { map ->
-                    renderMap(map, route!!, stations, bestId)
+                    renderMap(map, route, stations, bestId)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
             )
+
+            if (route == null) {
+                Text(
+                    text = "경로를 검색하면 출발지·도착지와 주유소가 지도에 표시됩니다.",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
 
             Row(
                 modifier = Modifier
@@ -124,9 +135,10 @@ fun MapScreen(
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                val dest = route!!.destination
+                val dest = route?.destination
                 OutlinedButton(
                     onClick = {
+                        if (dest == null) return@OutlinedButton
                         val uri = "kakaonavi://navigate?name=${Uri.encode(dest.name)}" +
                             "&x=${dest.lng}&y=${dest.lat}&coord_type=wgs84"
                         runCatching {
@@ -137,10 +149,11 @@ fun MapScreen(
                     shape = RoundedCornerShape(16.dp),
                     contentPadding = PaddingValues(vertical = 14.dp)
                 ) {
-                    Text(text = "카카오내비 안내")
+                    Text(text = if (dest == null) "경로 검색 후 안내" else "카카오내비 안내")
                 }
                 Button(
                     onClick = {
+                        if (dest == null) return@Button
                         val uri = "https://map.kakao.com/link/to/" +
                             "${Uri.encode(dest.name)},${dest.lat},${dest.lng}"
                         runCatching {
@@ -154,7 +167,7 @@ fun MapScreen(
                     ),
                     contentPadding = PaddingValues(vertical = 14.dp)
                 ) {
-                    Text(text = "카카오맵 경로")
+                    Text(text = if (dest == null) "경로 검색 후 안내" else "카카오맵 경로")
                 }
             }
         }
@@ -163,7 +176,7 @@ fun MapScreen(
 
 private fun renderMap(
     map: MapView,
-    route: Route,
+    route: Route?,
     stations: List<Station>,
     bestId: String?
 ) {
@@ -171,7 +184,7 @@ private fun renderMap(
         map.overlays.clear()
         val boundsPoints = mutableListOf<GeoPoint>()
 
-        val routePoints = route.polyline.map { GeoPoint(it.lat, it.lng) }
+        val routePoints = route?.polyline?.map { GeoPoint(it.lat, it.lng) }.orEmpty()
         if (routePoints.size >= 2) {
             val line = Polyline().apply {
                 setPoints(routePoints)
@@ -193,8 +206,15 @@ private fun renderMap(
             boundsPoints.add(point)
         }
 
-        addPin(route.origin.lat, route.origin.lng, "출발: ${route.origin.name}")
-        addPin(route.destination.lat, route.destination.lng, "도착: ${route.destination.name}")
+        if (route != null) {
+            addPin(route.origin.lat, route.origin.lng, "출발: ${route.origin.name}")
+            addPin(route.destination.lat, route.destination.lng, "도착: ${route.destination.name}")
+        } else {
+            val seoul = GeoPoint(37.5665, 126.9780)
+            map.controller.setZoom(11.0)
+            map.controller.setCenter(seoul)
+            boundsPoints.add(seoul)
+        }
         stations.take(10).forEach { s ->
             addPin(s.lat, s.lng, (if (s.id == bestId) "★ " else "") + stationHeading(s))
         }
