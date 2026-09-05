@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.fueloptimizer.domain.FuelKind
 import com.fueloptimizer.presentation.MainViewModel
+import com.fueloptimizer.presentation.PlaceSearchTarget
 import com.fueloptimizer.ui.components.TossCard
 import com.fueloptimizer.ui.components.TossInputField
 import com.fueloptimizer.ui.components.TossSearchField
@@ -190,7 +191,7 @@ fun HomeScreen(
 
                     TossSearchField(
                         value = state.origin?.name ?: "출발지 검색",
-                        onClick = { },
+                        onClick = { viewModel.startPlaceSearch(PlaceSearchTarget.ORIGIN) },
                         placeholder = "Search start point"
                     )
 
@@ -198,7 +199,7 @@ fun HomeScreen(
 
                     TossSearchField(
                         value = state.destination?.name ?: "도착지 검색",
-                        onClick = { },
+                        onClick = { viewModel.startPlaceSearch(PlaceSearchTarget.DESTINATION) },
                         placeholder = "Search destination"
                     )
                 }

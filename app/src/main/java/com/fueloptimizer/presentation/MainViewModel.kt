@@ -21,6 +21,9 @@ class MainViewModel : ViewModel() {
     private val _navigationRoute = MutableStateFlow("home")
     val navigationRoute: StateFlow<String> = _navigationRoute
 
+    private val _placeSearchTarget = MutableStateFlow<PlaceSearchTarget?>(null)
+    val placeSearchTarget: StateFlow<PlaceSearchTarget?> = _placeSearchTarget
+
     init {
         _state.value = UiState(
             vehicle = Vehicle(
@@ -36,6 +39,28 @@ class MainViewModel : ViewModel() {
 
     fun navigateTo(route: String) {
         _navigationRoute.value = route
+    }
+
+    fun startPlaceSearch(target: PlaceSearchTarget) {
+        _placeSearchTarget.value = target
+        navigateTo("search")
+    }
+
+    fun selectPlace(place: NamedPlace): Boolean {
+        val target = _placeSearchTarget.value ?: return false
+        if (target == PlaceSearchTarget.ORIGIN) {
+            updateOrigin(place)
+        } else {
+            updateDestination(place)
+        }
+        _placeSearchTarget.value = null
+        navigateTo("home")
+        return true
+    }
+
+    fun cancelPlaceSearch() {
+        _placeSearchTarget.value = null
+        navigateTo("home")
     }
 
     fun updateOrigin(place: NamedPlace) {
@@ -229,3 +254,7 @@ data class UiState(
     val vehicle: Vehicle? = null,
     val preferences: Preferences? = null,
 )
+
+enum class PlaceSearchTarget {
+    ORIGIN, DESTINATION
+}
