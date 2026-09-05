@@ -39,7 +39,7 @@ interface KakaoLocalApi {
     suspend fun searchKeyword(
         @Header("Authorization") auth: String,
         @Query("query") query: String,
-        @Query("size") size: Int = 10
+        @Query("size") size: Int = 30
     ): KakaoKeywordResponse
 }
 
