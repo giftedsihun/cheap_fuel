@@ -2,8 +2,13 @@ package com.fueloptimizer.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.fueloptimizer.BuildConfig
 import com.fueloptimizer.domain.*
+import com.fueloptimizer.network.KakaoClient
 import com.fueloptimizer.network.MockStations
+import com.fueloptimizer.network.SamplePlaces
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -24,6 +29,14 @@ class MainViewModel : ViewModel() {
     private val _placeSearchTarget = MutableStateFlow<PlaceSearchTarget?>(null)
     val placeSearchTarget: StateFlow<PlaceSearchTarget?> = _placeSearchTarget
 
+    private val _placeResults = MutableStateFlow<List<NamedPlace>>(emptyList())
+    val placeResults: StateFlow<List<NamedPlace>> = _placeResults
+
+    private val _placeSearching = MutableStateFlow(false)
+    val placeSearching: StateFlow<Boolean> = _placeSearching
+
+    private var placeSearchJob: Job? = null
+
     init {
         _state.value = UiState(
             vehicle = Vehicle(
@@ -43,6 +56,7 @@ class MainViewModel : ViewModel() {
 
     fun startPlaceSearch(target: PlaceSearchTarget) {
         _placeSearchTarget.value = target
+        searchPlaces("")
         navigateTo("search")
     }
 
@@ -61,6 +75,26 @@ class MainViewModel : ViewModel() {
     fun cancelPlaceSearch() {
         _placeSearchTarget.value = null
         navigateTo("home")
+    }
+
+    fun searchPlaces(query: String) {
+        placeSearchJob?.cancel()
+        placeSearchJob = viewModelScope.launch {
+            delay(400)
+            val apiKey = BuildConfig.KAKAO_REST_API_KEY
+            if (apiKey.isBlank()) {
+                _placeResults.value = SamplePlaces.filter(query)
+                return@launch
+            }
+            _placeSearching.value = true
+            try {
+                val online = KakaoClient.searchPlaces(apiKey, query)
+                _placeResults.value = if (online.isNotEmpty()) online
+                else SamplePlaces.filter(query)
+            } finally {
+                _placeSearching.value = false
+            }
+        }
     }
 
     fun updateOrigin(place: NamedPlace) {

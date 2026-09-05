@@ -19,7 +19,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fueloptimizer.domain.NamedPlace
-import com.fueloptimizer.network.MockStations
 import com.fueloptimizer.presentation.MainViewModel
 import com.fueloptimizer.presentation.PlaceSearchTarget
 import com.fueloptimizer.ui.components.TossCard
@@ -39,13 +38,19 @@ fun PlaceSearchScreen(
     val target by viewModel.placeSearchTarget.collectAsState()
     val isOrigin = target == PlaceSearchTarget.ORIGIN
     var query by remember { mutableStateOf("") }
+    val results by viewModel.placeResults.collectAsState()
+    val searching by viewModel.placeSearching.collectAsState()
 
-    val places = remember { samplePlaces() }
-    val filtered = remember(query) {
-        if (query.isBlank()) places
-        else places.filter {
-            it.place.name.contains(query, ignoreCase = true) ||
-                it.subtitle.contains(query, ignoreCase = true)
+    val options = remember(results) {
+        results.mapIndexed { index, place ->
+            PlaceOption(
+                place = place,
+                icon = if (place.name.contains("주유소")) Icons.Filled.MyLocation else {
+                    if (index % 3 == 0) Icons.Filled.Domain
+                    else Icons.Filled.LocationOn
+                },
+                subtitle = place.address ?: "위치 선택"
+            )
         }
     }
 
@@ -81,9 +86,20 @@ fun PlaceSearchScreen(
             ) {
                 OutlinedTextField(
                     value = query,
-                    onValueChange = { query = it },
+                    onValueChange = {
+                        query = it
+                        viewModel.searchPlaces(it)
+                    },
                     placeholder = { Text("장소 이름으로 검색") },
                     leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (searching) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
@@ -99,7 +115,17 @@ fun PlaceSearchScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(bottom = 24.dp)
             ) {
-                items(filtered, key = { it.place.name }) { option ->
+                if (options.isEmpty() && !searching) {
+                    item {
+                        Text(
+                            text = "검색 결과가 없어요. 다른 키워드로 검색해 보세요.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 24.dp)
+                        )
+                    }
+                }
+                items(options, key = { "${it.place.lat},${it.place.lng},${it.place.name}" }) { option ->
                     PlaceRow(
                         option = option,
                         onClick = { viewModel.selectPlace(option.place) }
@@ -138,32 +164,5 @@ private fun PlaceRow(option: PlaceOption, onClick: () -> Unit) {
                 )
             }
         }
-    }
-}
-
-private fun samplePlaces(): List<PlaceOption> {
-    val places = listOf(
-        NamedPlace(37.4979, 127.0276, "강남역", "서울 강남구 강남대로"),
-        NamedPlace(37.4846, 126.9876, "서울역", "서울 용산구 한강대로"),
-        NamedPlace(37.4966, 126.8738, "홍대입구", "서울 마포구 양화로"),
-        NamedPlace(37.5547, 126.9707, "숙대입구", "서울 용산구 한강대로"),
-        NamedPlace(37.5660, 126.9952, "광화문", "서울 종로구 세종대로"),
-        NamedPlace(37.5184, 127.0280, "삼성역", "서울 강남구 테헤란로"),
-        NamedPlace(37.5033, 127.0448, "선릉역", "서울 강남구 테헤란로"),
-        NamedPlace(37.4750, 127.0300, "자영알뜰주유소", "서울 강남구 역삼로"),
-        NamedPlace(37.4956, 127.0669, "판교테크노밸리", "경기 성남시 분당구"),
-        NamedPlace(35.1796, 129.0756, "부산 서면", "부산 부산진구 중앙대로"),
-        NamedPlace(36.3504, 127.3845, "대전역", "대전 동구 중앙로"),
-        NamedPlace(35.1596, 126.8526, "광주 송정역", "광주 광산구 송정로")
-    )
-    return places.mapIndexed { index, place ->
-        PlaceOption(
-            place = place,
-            icon = if (place.name.contains("주유소")) Icons.Filled.MyLocation else {
-                if (index % 3 == 0) Icons.Filled.Domain
-                else Icons.Filled.LocationOn
-            },
-            subtitle = place.address ?: "위치 선택"
-        )
     }
 }

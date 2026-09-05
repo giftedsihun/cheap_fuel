@@ -1,7 +1,17 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+val localProps = Properties()
+val localPropsFile = rootProject.file("local.properties")
+if (localPropsFile.exists()) {
+    localPropsFile.inputStream().use { localProps.load(it) }
+}
+val kakaoRestApiKey: String =
+    localProps.getProperty("kakaoRestApiKey", System.getenv("KAKAO_REST_API_KEY") ?: "")
 
 android {
     namespace = "com.fueloptimizer"
@@ -13,6 +23,7 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+        buildConfigField("String", "KAKAO_REST_API_KEY", "\"$kakaoRestApiKey\"")
     }
 
     buildTypes {
@@ -34,6 +45,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {
