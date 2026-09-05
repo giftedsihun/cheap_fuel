@@ -79,9 +79,28 @@ fun desiredLitersForPolicy(
 
 private fun parseHhmm(value: String): Int {
     val parts = value.split(":")
-    val h = parts[0].toIntOrNull() ?: 0
-    val m = parts[1].toIntOrNull() ?: 0
+    val h = parts.getOrNull(0)?.toIntOrNull() ?: 0
+    val m = parts.getOrNull(1)?.toIntOrNull() ?: 0
     return h * 60 + m
+}
+
+fun parseIsoDate(value: String): java.util.Date? {
+    val patterns = listOf(
+        "yyyy-MM-dd'T'HH:mm:ss",
+        "yyyy-MM-dd'T'HH:mm",
+        "yyyy-MM-dd"
+    )
+    for (pattern in patterns) {
+        val sdf = java.text.SimpleDateFormat(pattern, java.util.Locale.US)
+        sdf.timeZone = java.util.TimeZone.getTimeZone("Asia/Seoul")
+        sdf.isLenient = false
+        try {
+            return sdf.parse(value)
+        } catch (e: java.text.ParseException) {
+            // try next pattern
+        }
+    }
+    return null
 }
 
 fun minutesOfDayInSeoul(at: java.util.Date): Int {
@@ -199,13 +218,16 @@ fun evaluateOption(station: Station, detour: Detour, ctx: CostContext): RefuelOp
         )
     }
 
-    val ageH = (ctx.departAt.time - java.util.Date(station.priceUpdatedAt).time) / 3_600_000.0
+    val ageH = parseIsoDate(station.priceUpdatedAt)?.let { updated ->
+        (ctx.departAt.time - updated.time) / 3_600_000.0
+    } ?: Double.NaN
     if (ageH.isFinite() && ageH > STALE_PRICE_HOURS) {
         warnings.add(
             Warning(
                 code = WarningCode.stalePrice,
                 severity = Severity.info,
-                message = "가격 신고가 ${(ageH / 24).toInt()}일 전입니다."
+                message = if (ageH < 24) "가격 신고가 ${ageH.toInt()}시간 전입니다."
+                else "가격 신고가 ${(ageH / 24).toInt()}일 전입니다."
             )
         )
     }

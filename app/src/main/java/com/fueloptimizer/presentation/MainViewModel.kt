@@ -93,12 +93,13 @@ class MainViewModel : ViewModel() {
 
         viewModelScope.launch {
             val distance = haversineDistance(origin.lat, origin.lng, destination.lat, destination.lng)
+            val distanceM = distance * 1000
             val route = Route(
                 id = "route_1",
                 origin = origin,
                 destination = destination,
-                distanceM = distance * 1000,
-                durationS = (distance * 1000 / 60.0),
+                distanceM = distanceM,
+                durationS = distanceM * 3.6 / 50.0,
                 polyline = listOf(origin, destination),
                 summary = "직선 거리 ${String.format("%.0f", distance)}km"
             )
@@ -123,7 +124,7 @@ class MainViewModel : ViewModel() {
 
                 val detour = Detour(
                     extraDistanceM = detourDist,
-                    extraDurationS = detourDist / 60.0,
+                    extraDurationS = detourDist * 3.6 / 40.0,
                     extraTollKrw = 0.0,
                     alongRouteM = 0.0,
                     joinPoint = PointLatLng(station.lat, station.lng),
@@ -148,20 +149,29 @@ class MainViewModel : ViewModel() {
                 .filter { it.reachable }
                 .sortedBy { it.normalizedCostKrw }
 
-            val baseline = sortedOptions.firstOrNull()
+            val litersRequired = litersRequiredForTrip(vehicle, route.distanceM, preferences.fillPolicy)
+            val tripNeedL = route.distanceM / 1000 / vehicle.kmPerLiter
+            val canReach = tripNeedL <= vehicle.currentFuelL - destinationHoldL(vehicle, preferences.fillPolicy)
+
             val best = sortedOptions.firstOrNull()
+            val baselineCost = refPrice * litersRequired
+            val bestSaving = best?.let { baselineCost - it.normalizedCostKrw } ?: 0.0
 
             val verdict = when {
                 options.isEmpty() -> Verdict.noCandidates
+                canReach -> Verdict.noRefuelNeeded
                 best == null -> Verdict.stayOnRoute
-                baseline != null && best.normalizedCostKrw < baseline.normalizedCostKrw -> Verdict.detourWorthIt
+                bestSaving >= preferences.minMeaningfulSavingKrw -> Verdict.detourWorthIt
+                bestSaving > 0 -> Verdict.marginal
                 else -> Verdict.stayOnRoute
             }
 
             val headline = when (verdict) {
-                Verdict.noCandidates -> "도착하면 주유해주세요"
+                Verdict.noCandidates -> "주유할 곳이 없습니다"
+                Verdict.noRefuelNeeded -> "주유 없이 도착 가능합니다"
+                Verdict.detourWorthIt -> "우회 주유가 절약됩니다"
+                Verdict.marginal -> "절감이 근소합니다 — 우회는 선택"
                 Verdict.stayOnRoute -> "가장 가까운 곳에서 주유하세요"
-                Verdict.detourWorthIt -> "우회해서 주유하는 것이 좋습니다"
                 else -> "최적 주유 계획"
             }
 
@@ -169,13 +179,13 @@ class MainViewModel : ViewModel() {
                 route = route,
                 vehicle = vehicle,
                 preferences = preferences,
-                litersRequiredWithoutDetour = litersRequiredForTrip(vehicle, route.distanceM, preferences.fillPolicy),
-                canReachWithoutRefueling = vehicle.currentFuelL + vehicle.reserveL >= litersRequiredForTrip(vehicle, route.distanceM, FillPolicy(FillPolicyMode.toDestination)),
+                litersRequiredWithoutDetour = litersRequired,
+                canReachWithoutRefueling = canReach,
                 referencePriceKrwPerL = refPrice,
-                baseline = baseline?.let { toRanked(it, 1, baseline.normalizedCostKrw) },
-                best = best?.let { toRanked(it, 1, baseline?.normalizedCostKrw ?: 0.0) },
+                baseline = best?.let { toRanked(it, 1, baselineCost) },
+                best = best?.let { toRanked(it, 1, baselineCost) },
                 options = sortedOptions.mapIndexed { index, option ->
-                    toRanked(option, index + 1, baseline?.normalizedCostKrw ?: option.normalizedCostKrw)
+                    toRanked(option, index + 1, baselineCost)
                 },
                 excluded = emptyList(),
                 verdict = verdict,

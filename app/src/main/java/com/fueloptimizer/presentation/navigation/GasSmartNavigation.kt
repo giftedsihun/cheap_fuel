@@ -63,8 +63,7 @@ fun GasSmartNavigation(
                     onNavigateToResult = { onNavigateTo("result") }
                 )
                 "result" -> ResultScreen(
-                    viewModel = viewModel,
-                    onNavigateToMap = { /* Navigate to map */ }
+                    viewModel = viewModel
                 )
                 "settings" -> SettingsScreen()
                 "search" -> PlaceSearchScreen(

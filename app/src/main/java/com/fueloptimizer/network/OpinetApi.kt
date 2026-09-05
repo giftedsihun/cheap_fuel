@@ -59,6 +59,12 @@ object BrandMapper {
 }
 
 object MockStations {
+    private val nowIso: String by lazy {
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+        sdf.timeZone = java.util.TimeZone.getTimeZone("Asia/Seoul")
+        sdf.format(java.util.Date())
+    }
+
     val sampleStations = listOf(
         Station(
             id = "station_1",
@@ -72,7 +78,7 @@ object MockStations {
                 FuelKind.premium to 1950.0,
                 FuelKind.diesel to 1800.0,
             ),
-            priceUpdatedAt = "2024-01-01T00:00:00",
+            priceUpdatedAt = nowIso,
             openingHours = OpeningHours(allDay = true),
             accessHint = AccessHint(oppositeSide = false, requiresHighwayExit = false, onHighway = false)
         ),
@@ -88,7 +94,7 @@ object MockStations {
                 FuelKind.premium to 1930.0,
                 FuelKind.diesel to 1780.0,
             ),
-            priceUpdatedAt = "2024-01-01T00:00:00",
+            priceUpdatedAt = nowIso,
             openingHours = OpeningHours(allDay = true),
             accessHint = AccessHint(oppositeSide = false, requiresHighwayExit = false, onHighway = false)
         ),
@@ -104,7 +110,7 @@ object MockStations {
                 FuelKind.premium to 1970.0,
                 FuelKind.diesel to 1820.0,
             ),
-            priceUpdatedAt = "2024-01-01T00:00:00",
+            priceUpdatedAt = nowIso,
             openingHours = OpeningHours(allDay = true),
             accessHint = AccessHint(oppositeSide = false, requiresHighwayExit = false, onHighway = false)
         ),
@@ -120,7 +126,7 @@ object MockStations {
                 FuelKind.premium to 1920.0,
                 FuelKind.diesel to 1770.0,
             ),
-            priceUpdatedAt = "2024-01-01T00:00:00",
+            priceUpdatedAt = nowIso,
             openingHours = OpeningHours(allDay = true),
             accessHint = AccessHint(oppositeSide = false, requiresHighwayExit = false, onHighway = false)
         ),
@@ -135,7 +141,7 @@ object MockStations {
                 FuelKind.gasoline to 1790.0,
                 FuelKind.diesel to 1740.0,
             ),
-            priceUpdatedAt = "2024-01-01T00:00:00",
+            priceUpdatedAt = nowIso,
             openingHours = OpeningHours(allDay = false, open = "07:00", close = "22:00"),
             accessHint = AccessHint(oppositeSide = false, requiresHighwayExit = false, onHighway = false)
         )

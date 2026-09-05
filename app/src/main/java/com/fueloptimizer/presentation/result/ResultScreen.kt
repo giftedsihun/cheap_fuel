@@ -8,10 +8,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.content.Intent
+import android.net.Uri
 import com.fueloptimizer.domain.RankedOption
 import com.fueloptimizer.presentation.MainViewModel
 import com.fueloptimizer.ui.components.TossCard
@@ -19,8 +22,7 @@ import com.fueloptimizer.ui.components.TossCard
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ResultScreen(
-    viewModel: MainViewModel = viewModel(),
-    onNavigateToMap: () -> Unit = {}
+    viewModel: MainViewModel = viewModel()
 ) {
     val plan by viewModel.refuelPlan.collectAsState()
 
@@ -137,17 +139,25 @@ fun ResultScreen(
                     }
                 }
 
-                Button(
-                    onClick = onNavigateToMap,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Text(text = "지도에서 보기")
+                p.best?.let { best ->
+                    val context = LocalContext.current
+                    Button(
+                        onClick = {
+                            val uri = "geo:${best.station.lat},${best.station.lng}?q=${best.station.name}"
+                            runCatching {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(uri)))
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Text(text = "지도에서 보기")
+                    }
                 }
             } ?: run {
                 Box(
