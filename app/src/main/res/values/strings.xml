@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Gas Smart</string>
+    <string name="home_title">Gas Smart</string>
+    <string name="search_hint">출발지 또는 목적지 검색</string>
+    <string name="departure">출발</string>
+    <string name="destination">도착</string>
+    <string name="current_location">현재 위치</string>
+    <string name="vehicle_settings">차량 설정</string>
+    <string name="fuel_kind">유종</string>
+    <string name="fuel_efficiency">연비 (km/L)</string>
+    <string name="tank_capacity">탱크 용량 (L)</string>
+    <string name="current_fuel">현재 연료량 (L)</string>
+    <string name="find_route">경로 찾기</string>
+    <string name="result_title">주유 추천 결과</string>
+    <string name="no_candidates">주유 후보가 없습니다</string>
+    <string name="loading">로딩 중...</string>
+    <string name="error_occurred">오류가 발생했습니다</string>
+    <string name="retry">다시 시도</string>
+    <string name="detour_worth_it">우회해서 주유하는 게 이득입니다</string>
+    <string name="stay_on_route">그냥 가도 됩니다</string>
+    <string name="savings">절감액</string>
+    <string name="total_cost">총 비용</string>
+    <string name="detour_distance">우회 거리</string>
+    <string name="detour_time">우회 시간</string>
+    <string name="liters_to_buy">주유량</string>
+    <string name="price_per_liter">리터당 가격</string>
+    <string name="effective_price">실제 단가</string>
+    <string name="reserve_fuel">예비량</string>
+    <string name="time_value">시간 가치 (원/분)</string>
+    <string name="card_discount">카드 할인 (원/L)</string>
+    <string name="self_service_only">셀프만 보기</string>
+    <string name="max_detour_km">최대 우회 거리 (km)</string>
+    <string name="max_detour_min">최대 우회 시간 (분)</string>
+    <string name="fill_policy">주유 정책</string>
+    <string name="to_destination">목적지까지</string>
+    <string name="fill_full">가득 채우기</string>
+    <string name="fixed_liters">정량 주유</string>
+    <string name="fixed_budget">정액 주유</string>
+    <string name="navigate">길안내 시작</string>
+    <string name="skip_refuel">주유 건너뛰기</string>
+    <string name="history">기록</string>
+    <string name="settings">설정</string>
+    <string name="about">앱 정보</string>
+    <string name="version">버전 1.0</string>
+</resources>
