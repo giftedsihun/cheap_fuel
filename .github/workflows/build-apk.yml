@@ -21,11 +21,11 @@ jobs:
           name: app-debug.apk
           path: app/build/outputs/apk/debug/app-debug.apk
       - name: Release APK
-        if: github.ref == 'refs/heads/android-port'
+        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/android-port'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: android-port
-          name: Gas Smart Android (android-port)
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'android-port' }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'Gas Smart Android (android-port)' }}
           files: app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
